@@ -1,0 +1,13 @@
+.next/
+node_modules/
+
+# env files — never commit secrets
+.env*
+
+# vercel
+.vercel
+
+# build artifacts
+*.tsbuildinfo
+*.mjs
+server.log
