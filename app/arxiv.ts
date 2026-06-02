@@ -9,7 +9,8 @@ const USER_AGENT = "arxiv-mcp/1.0 (personal research assistant)";
 // caches and a retrying fetch so a hot query never touches the network twice.
 const MAX_RETRIES = 3;        // attempts after the first = 3 (so up to 4 calls)
 const BASE_DELAY_MS = 600;    // backoff base; grows 600 -> 1200 -> 2400 ...
-const MAX_DELAY_MS = 8_000;   // cap any single sleep so we stay within maxDuration
+const MAX_DELAY_MS = 8_000;   // cap any single sleep
+const RETRY_BUDGET_MS = 15_000; // hard ceiling on TOTAL retry wall-time, so a sustained 429 storm can't blow Vercel's maxDuration (30s) — fail fast instead
 const L1_TTL_MS = 60_000;     // in-memory layer: dedupes repeats within a session
 const L1_MAX_ENTRIES = 200;   // crude bound so a warm instance can't grow forever
 const L2_TTL_SECONDS = 3_600; // durable Data Cache layer: survives cold starts
@@ -98,12 +99,16 @@ function backoffDelay(attempt: number, retryAfterMs: number | null): number {
 // caches sit in front of, so a cache hit never reaches here.
 async function fetchArxivWithRetry(params: Record<string, string>): Promise<ArxivPaper[]> {
   const url = `${ARXIV_API}?${new URLSearchParams(params).toString()}`;
+  const deadline = Date.now() + RETRY_BUDGET_MS;
   let lastErr: Error | null = null;
   let retryAfterMs: number | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
-      await sleep(backoffDelay(attempt, retryAfterMs));
+      const delay = backoffDelay(attempt, retryAfterMs);
+      // Don't sleep past our wall-time budget — fail fast rather than blow maxDuration.
+      if (Date.now() + delay > deadline) break;
+      await sleep(delay);
       retryAfterMs = null;
     }
 
@@ -191,7 +196,7 @@ export async function searchArxiv(opts: {
   return fetchArxiv({
     search_query: buildSearchQuery(opts.query, opts.category),
     start: "0",
-    max_results: String(Math.min(opts.maxResults ?? 10, 50)),
+    max_results: String(Math.min(opts.maxResults ?? 10, 100)),
     sortBy: opts.sortBy ?? "relevance",
     sortOrder: "descending",
   });
