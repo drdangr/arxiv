@@ -8,16 +8,24 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 function formatPaper(p: ArxivPaper): string {
+  const meta = [
+    p.arxiv_id ? `arXiv:${p.arxiv_id}` : p.doi ? `doi:${p.doi}` : null,
+    p.source || null,
+    p.primary_category || null,
+    p.published ? `published ${p.published.slice(0, 10)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
   return [
     `**${p.title}**`,
-    `arXiv:${p.arxiv_id} | ${p.primary_category} | published ${p.published?.slice(0, 10)}`,
+    meta,
     `Authors: ${p.authors.join(", ")}`,
     p.comment ? `Comment: ${p.comment}` : "",
     ``,
     p.summary,
     ``,
-    `PDF: ${p.pdf_url}`,
-    `Abstract page: ${p.abs_url}`,
+    p.pdf_url ? `PDF: ${p.pdf_url}` : "",
+    p.abs_url ? `Link: ${p.abs_url}` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -25,15 +33,10 @@ const handler = createMcpHandler(
   (server) => {
     server.tool(
       "search_arxiv",
-      "Search arXiv preprints. Accepts plain text (matched across all fields) OR arXiv's native query syntax for precision. Best for CS/ML/physics/math research (e.g. cs.AI, cs.CL, cs.LG). Returns titles, authors, abstracts, and PDF links.",
+      "Keyword search across scholarly literature (all fields, via OpenAlex; arXiv preprints and peer-reviewed work alike). Returns titles, authors, abstracts, and links. For meaning-based search on complex topics, prefer semantic_search.",
       {
-        query: z.string().describe(
-          "Plain text is matched across all fields, e.g. 'retrieval augmented generation'. " +
-            "For precision use arXiv's native syntax: field prefixes ti: (title), abs: (abstract), au: (author), cat: (category); " +
-            "boolean operators AND / OR / ANDNOT (uppercase); parentheses for grouping; double quotes for exact phrases. " +
-            'Example: ti:"retrieval augmented" AND cat:cs.CL ANDNOT abs:image'
-        ),
-        category: z.string().optional().describe("Optional arXiv category filter, e.g. 'cs.AI', 'cs.CL', 'cs.LG'"),
+        query: z.string().describe("Keywords or a short phrase matched across title, abstract and full text, e.g. 'retrieval augmented generation'."),
+        category: z.string().optional().describe("Best-effort arXiv category hint (e.g. 'cs.CL'); only applied if the arXiv fallback is used."),
         max_results: z.number().int().min(1).max(50).optional().describe("Number of results, default 10, max 50"),
         sort_by: z.enum(["relevance", "lastUpdatedDate", "submittedDate"]).optional().describe("Sort order, default relevance. Use submittedDate for newest first."),
       },
@@ -72,7 +75,7 @@ const handler = createMcpHandler(
 
     server.tool(
       "semantic_search",
-      "Semantically search arXiv: pulls a broad candidate set, then reranks it by meaning using embeddings. Use for complex or nuanced topics where keyword matching misses relevant papers or buries them under false matches. For exact field/author/category lookups, prefer search_arxiv.",
+      "Semantically search scholarly literature: pulls a broad candidate set (all fields, via OpenAlex), then reranks it by meaning using embeddings. Use for complex or nuanced topics where keyword matching misses relevant work or buries it under false matches. Phrase the query as a rich description.",
       {
         query: z.string().describe("A rich natural-language description of what you want, e.g. 'how language-model agents retain memory across long multi-step tasks'. Describe the concept in full — semantic rerank rewards detail, not keywords."),
         category: z.string().optional().describe("Optional arXiv category filter, e.g. 'cs.AI', 'cs.CL', 'cs.LG'"),
