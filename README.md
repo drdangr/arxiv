@@ -53,7 +53,23 @@ local working directory directly, bypassing git.
 
     https://<your-deployment>.vercel.app/api/mcp
 
-Header required:  Authorization: Bearer <YOUR_TOKEN>
+Auth (either works — same secret as `MCP_BEARER_TOKEN`):
+- URL query: append `?key=<YOUR_TOKEN>` to the endpoint
+- Header: `Authorization: Bearer <YOUR_TOKEN>`
 
 ## Connect to Claude
-Settings -> Connectors -> Add custom connector -> paste the /api/mcp URL and the bearer token.
+Settings -> Connectors -> Add custom connector -> paste the endpoint URL.
+Claude's connector form has no header field, so put the secret in the URL:
+
+    https://<your-deployment>.vercel.app/api/mcp?key=<YOUR_TOKEN>
+
+## Notes
+
+- **New tools need a connector refresh.** After adding or renaming a tool,
+  remove and re-add (or refresh) the connector in Claude — an existing
+  connection caches the tool list from connect time and won't show new tools.
+- **arXiv rate-limits bursts.** It asks for ~1 request / 3s and answers bursts
+  with HTTP 429 (cooldown lengthens under repeated violations). `semantic_search`
+  pulls ~60 candidates in a single request; the retry path honors `Retry-After`
+  and is capped at ~15s total so it stays within the 30s function limit. Don't
+  hammer it in tight loops.
