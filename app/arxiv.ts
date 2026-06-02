@@ -170,18 +170,26 @@ async function fetchArxiv(params: Record<string, string>): Promise<ArxivPaper[]>
   return data;
 }
 
+// arXiv's API supports field-prefixed, boolean queries — far sharper than a
+// bare keyword match. If the caller already used that syntax (ti:, abs:, au:,
+// cat:, AND/OR/ANDNOT, or "quoted phrases"), pass it through untouched;
+// otherwise treat the text as free-text search across all fields.
+const ARXIV_SYNTAX = /\b(?:ti|abs|au|co|jr|cat|rn|all):|\b(?:AND|OR|ANDNOT)\b|"/;
+
+function buildSearchQuery(query: string, category?: string): string {
+  const q = query.trim();
+  const core = ARXIV_SYNTAX.test(q) ? q : `all:${q}`;
+  return category ? `(${core}) AND cat:${category}` : core;
+}
+
 export async function searchArxiv(opts: {
   query: string;
   category?: string;
   maxResults?: number;
   sortBy?: "relevance" | "lastUpdatedDate" | "submittedDate";
 }): Promise<ArxivPaper[]> {
-  let searchQuery = `all:${opts.query}`;
-  if (opts.category) {
-    searchQuery = `(${searchQuery}) AND cat:${opts.category}`;
-  }
   return fetchArxiv({
-    search_query: searchQuery,
+    search_query: buildSearchQuery(opts.query, opts.category),
     start: "0",
     max_results: String(Math.min(opts.maxResults ?? 10, 50)),
     sortBy: opts.sortBy ?? "relevance",

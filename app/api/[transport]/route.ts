@@ -24,9 +24,14 @@ const handler = createMcpHandler(
   (server) => {
     server.tool(
       "search_arxiv",
-      "Search arXiv preprints by free-text query. Best for CS/ML/physics/math research (e.g. cs.AI, cs.CL, cs.LG). Returns titles, authors, abstracts, and PDF links.",
+      "Search arXiv preprints. Accepts plain text (matched across all fields) OR arXiv's native query syntax for precision. Best for CS/ML/physics/math research (e.g. cs.AI, cs.CL, cs.LG). Returns titles, authors, abstracts, and PDF links.",
       {
-        query: z.string().describe("Free-text search query, e.g. 'memory in LLM agents' or 'retrieval augmented generation'"),
+        query: z.string().describe(
+          "Plain text is matched across all fields, e.g. 'retrieval augmented generation'. " +
+            "For precision use arXiv's native syntax: field prefixes ti: (title), abs: (abstract), au: (author), cat: (category); " +
+            "boolean operators AND / OR / ANDNOT (uppercase); parentheses for grouping; double quotes for exact phrases. " +
+            'Example: ti:"retrieval augmented" AND cat:cs.CL ANDNOT abs:image'
+        ),
         category: z.string().optional().describe("Optional arXiv category filter, e.g. 'cs.AI', 'cs.CL', 'cs.LG'"),
         max_results: z.number().int().min(1).max(50).optional().describe("Number of results, default 10, max 50"),
         sort_by: z.enum(["relevance", "lastUpdatedDate", "submittedDate"]).optional().describe("Sort order, default relevance. Use submittedDate for newest first."),
