@@ -1,23 +1,26 @@
 # arXiv MCP (Vercel)
 
-Personal MCP server wrapping the arXiv API.
+Personal MCP server for searching scientific literature. Primary source is
+**OpenAlex** (all scholarly literature — journals, books, preprints incl. arXiv);
+arXiv's API is kept as a fallback. Deployed on Vercel.
 
 ## Tools
 
-- **search_scientific_literature** — keyword search. Accepts plain text (matched across all
-  fields) or arXiv's native query syntax for precision: field prefixes `ti:`
-  `abs:` `au:` `cat:`, boolean `AND`/`OR`/`ANDNOT` (uppercase), parentheses,
-  and `"quoted phrases"`. Params: `query`, `category?`, `max_results?`, `sort_by?`.
-- **get_arxiv_paper** — fetch one paper's full metadata + abstract by id
-  (e.g. `2401.12345` or `2401.12345v2`).
+- **search_scientific_literature** — keyword search across all scholarly
+  literature (via OpenAlex); matches title/abstract/full text. Params: `query`,
+  `category?` (best-effort arXiv hint, used only by the arXiv fallback),
+  `max_results?`, `sort_by?`.
 - **semantic_search** — meaning-based search for complex / nuanced topics. Pulls
-  a broad candidate set from arXiv, then reranks by cosine similarity of OpenAI
+  a broad candidate set from OpenAlex, then reranks by cosine similarity of OpenAI
   embeddings (query vs title+abstract). Params: `query` (a rich natural-language
   description), `category?`, `top_k?`. Requires `OPENAI_API_KEY` (see Deploy).
+- **get_arxiv_paper** — fetch one paper's metadata + abstract by arXiv id
+  (e.g. `2401.12345` or `2401.12345v2`).
 
-All arXiv calls share one path with retry+backoff (respects `Retry-After`,
-total retry time bounded to stay within the serverless limit) and a two-layer
-cache (in-memory L1 + durable L2).
+Search runs through one source-agnostic path: **OpenAlex first** (polite pool via
+`mailto`), **arXiv only as an empty/error fallback**. A two-layer cache (in-memory
+L1 + durable L2) and retry/backoff (bounded total time) wrap it. OpenAlex
+abstracts arrive as an inverted index and are reconstructed to plain text.
 
 ## Deploy
 
@@ -34,9 +37,9 @@ After first deploy, set the environment variables:
     # paste each value when prompted — never commit secrets
 
 Then redeploy: `vercel deploy --prod`, or just push to `main` (see Updating).
-`OPENAI_API_KEY` is optional — without it, search_scientific_literature and get_arxiv_paper
-still work; only semantic_search needs it. (The keyword tool is named
-`search_scientific_literature` — it covers all scholarly literature, not only arXiv.)
+`OPENAI_API_KEY` is optional — without it, search_scientific_literature and
+get_arxiv_paper still work; only semantic_search needs it. `OPENALEX_MAILTO` is
+also optional (polite-pool contact; falls back to a default in the code).
 
 ### Updating
 
@@ -69,8 +72,8 @@ Claude's connector form has no header field, so put the secret in the URL:
 - **New tools need a connector refresh.** After adding or renaming a tool,
   remove and re-add (or refresh) the connector in Claude — an existing
   connection caches the tool list from connect time and won't show new tools.
-- **arXiv rate-limits bursts.** It asks for ~1 request / 3s and answers bursts
-  with HTTP 429 (cooldown lengthens under repeated violations). `semantic_search`
-  pulls ~60 candidates in a single request; the retry path honors `Retry-After`
-  and is capped at ~15s total so it stays within the 30s function limit. Don't
-  hammer it in tight loops.
+- **Why OpenAlex is primary.** arXiv's API throttles cloud/datacenter egress IPs
+  (e.g. Vercel) with HTTP 429 regardless of request rate, so it can't be the
+  primary source from serverless. OpenAlex serves datacenter IPs fine via its
+  polite pool (always send `mailto`). arXiv stays as a thin empty/error fallback;
+  its retry path is time-bounded (~15s) to stay within the 30s function limit.
