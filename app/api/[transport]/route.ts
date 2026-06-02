@@ -32,7 +32,7 @@ function formatPaper(p: ArxivPaper): string {
 const handler = createMcpHandler(
   (server) => {
     server.tool(
-      "search_arxiv",
+      "search_scientific_literature",
       "Keyword search across scholarly literature (all fields, via OpenAlex; arXiv preprints and peer-reviewed work alike). Returns titles, authors, abstracts, and links. For meaning-based search on complex topics, prefer semantic_search.",
       {
         query: z.string().describe("Keywords or a short phrase matched across title, abstract and full text, e.g. 'retrieval augmented generation'."),

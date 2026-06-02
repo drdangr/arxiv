@@ -4,7 +4,7 @@ Personal MCP server wrapping the arXiv API.
 
 ## Tools
 
-- **search_arxiv** — keyword search. Accepts plain text (matched across all
+- **search_scientific_literature** — keyword search. Accepts plain text (matched across all
   fields) or arXiv's native query syntax for precision: field prefixes `ti:`
   `abs:` `au:` `cat:`, boolean `AND`/`OR`/`ANDNOT` (uppercase), parentheses,
   and `"quoted phrases"`. Params: `query`, `category?`, `max_results?`, `sort_by?`.
@@ -34,8 +34,9 @@ After first deploy, set the environment variables:
     # paste each value when prompted — never commit secrets
 
 Then redeploy: `vercel deploy --prod`, or just push to `main` (see Updating).
-`OPENAI_API_KEY` is optional — without it, search_arxiv and get_arxiv_paper
-still work; only semantic_search needs it.
+`OPENAI_API_KEY` is optional — without it, search_scientific_literature and get_arxiv_paper
+still work; only semantic_search needs it. (The keyword tool is named
+`search_scientific_literature` — it covers all scholarly literature, not only arXiv.)
 
 ### Updating
 
